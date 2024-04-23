@@ -2,7 +2,14 @@
 
 public static class CommonValues
 {
-    public const string TerraCHCommentUrl = "https://terrach.net/wp-content/themes/LightSNS/module/more/comment.php";
+    /// <summary>
+    /// 帖子评论
+    /// </summary>
+    public const string TerraCHPostCommentUrl = "https://terrach.net/wp-content/themes/LightSNS/module/more/comment.php";
+    /// <summary>
+    /// 文章/动态评论
+    /// </summary>
+    public const string TerraCHDynamicCommentUrl = "https://terrach.net/wp-content/themes/LightSNS/module/more/post-comment.php";
     public const string TerraCHPageBase = "https://terrach.net/";
     public const string TerraCHAuthorBase = "https://terrach.net/author/";
 
