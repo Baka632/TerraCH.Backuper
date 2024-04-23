@@ -12,6 +12,7 @@ public static class CommonValues
     public const string TerraCHDynamicCommentUrl = "https://terrach.net/wp-content/themes/LightSNS/module/more/post-comment.php";
     public const string TerraCHPageBase = "https://terrach.net/";
     public const string TerraCHAuthorBase = "https://terrach.net/author/";
+    public const int WaitTimeMilliseconds = 2000;
 
     public static readonly Uri TerraCHBase = new("https://terrach.net/");
     public static readonly HttpClient RequestClient = new();
