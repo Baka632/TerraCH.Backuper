@@ -20,7 +20,7 @@ Console.WriteLine("==========");
 
 int loopCount = 0;
 HtmlParser parser = new();
-while (config.PostPosition < 30000)
+while (config.PostPosition < 29800)
 {
     if (CancelToken.IsCancellationRequested)
     {
@@ -111,7 +111,7 @@ while (config.PostPosition < 30000)
                                 if (commentDoc.GetElementsByClassName("jinsom-tips").Length != 0)
                                 {
                                     Console.Beep();
-                                    Console.WriteLine($"\t第 {commentPage} 页存在登陆/购买才能查看的内容。");
+                                    Console.WriteLine($"\t\t第 {commentPage} 页存在登陆/购买才能查看的内容。");
                                 }
 
                                 string commentTargetPath = Path.Combine(postDir, $"{commentPage}.html");
@@ -132,7 +132,7 @@ while (config.PostPosition < 30000)
                             }
                         }
 
-                        Thread.Sleep(WaitTimeMilliseconds);
+                        //Thread.Sleep(WaitTimeMilliseconds);
                     } while (content != "0" && string.IsNullOrWhiteSpace(content) != true);
                 }
                 // 没下一页直接走
@@ -164,19 +164,19 @@ while (config.PostPosition < 30000)
                                 if (commentDoc.GetElementsByClassName("follow-see").Length != 0)
                                 {
                                     Console.Beep();
-                                    Console.WriteLine($"\t第 {commentPage} 页存在需关注才能查看的内容。");
+                                    Console.WriteLine($"\t\t第 {commentPage} 页存在需关注才能查看的内容。");
                                 }
 
                                 if (commentDoc.GetElementsByClassName("comment-see").Length != 0)
                                 {
                                     Console.Beep();
-                                    Console.WriteLine($"\t第 {commentPage} 页存在需回复才能查看的内容。");
+                                    Console.WriteLine($"\t\t第 {commentPage} 页存在需回复才能查看的内容。");
                                 }
 
                                 if (commentDoc.GetElementsByClassName("jinsom-tips").Length != 0)
                                 {
                                     Console.Beep();
-                                    Console.WriteLine($"\t第 {commentPage} 页存在登陆/购买才能查看的内容。");
+                                    Console.WriteLine($"\t\t第 {commentPage} 页存在登陆/购买才能查看的内容。");
                                 }
 
                                 string commentTargetPath = Path.Combine(postDir, $"{commentPage}.html");
@@ -197,7 +197,7 @@ while (config.PostPosition < 30000)
                             }
                         }
 
-                        Thread.Sleep(WaitTimeMilliseconds);
+                        //Thread.Sleep(WaitTimeMilliseconds);
                     } while (content != "0" && string.IsNullOrWhiteSpace(content) != true);
                 }
                 // 同样，没下一页直接走
@@ -226,19 +226,20 @@ while (config.PostPosition < 30000)
             config.PostPosition++;
         }
     }
-    catch (HttpRequestException)
+    catch (HttpRequestException ex)
     {
-        Console.WriteLine($"\t下载此页面失败，正在重试.....（{loopCount} of 5）");
+        Console.Beep();
+        Console.WriteLine($"\t下载此页面失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
         loopCount++;
 
         if (loopCount > 5)
         {
-            config.PostPosition++;
-            loopCount = 0;
+            Console.WriteLine("下载此页面失败。");
+            break;
         }
     }
 
-    Thread.Sleep(WaitTimeMilliseconds);
+    //Thread.Sleep(WaitTimeMilliseconds);
 }
 
 static void OnConsoleCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
