@@ -22,12 +22,11 @@ internal static class PostSaver
                 break;
             }
 
-            int position = config.PostPosition;
-
             try
             {
-                await BackupTarget(position, postPath);
+                await BackupTarget(config.PostPosition, postPath);
                 config.PostPosition++;
+                loopCount = 0;
             }
             catch (HttpRequestException ex)
             {
@@ -37,7 +36,7 @@ internal static class PostSaver
 
                 if (loopCount > 5)
                 {
-                    Console.WriteLine("下载此页面失败。");
+                    Console.WriteLine("\t下载此页面失败。");
                     break;
                 }
             }
@@ -108,7 +107,6 @@ internal static class PostSaver
             if (document.GetElementsByClassName("jinsom-posts-list").Length != 0)
             {
                 // 动态/文章
-
                 if (document.GetElementsByClassName(" jinsom-post-comment-more").Length != 0)
                 {
                     // 有下一页
@@ -119,7 +117,6 @@ internal static class PostSaver
             else
             {
                 // 帖子
-
                 if (document.GetElementsByClassName("jinsom-bbs-comment-list-page").Length != 0)
                 {
                     // 有下一页
@@ -137,7 +134,7 @@ internal static class PostSaver
                 TerraCHBase.MakeRelativeUri(message.RequestMessage.RequestUri).ToString() :
                 postId.ToString();
 
-            string postDir = Path.Combine(postPath, $"[404]{folderName}");
+            string postDir = Path.Combine(postPath, $"{folderName}[404]");
             if (Directory.Exists(postDir) != true)
             {
                 Directory.CreateDirectory(postDir);
@@ -169,6 +166,7 @@ internal static class PostSaver
                 content = await result.Content.ReadAsStringAsync();
                 SaveCommentCore(content, commentPage, postDir);
                 commentPage++;
+                commentLoopCount = 0;
             }
             catch (HttpRequestException ex)
             {
@@ -198,6 +196,7 @@ internal static class PostSaver
                 content = await result.Content.ReadAsStringAsync();
                 SaveCommentCore(content, commentPage, postDir);
                 commentPage++;
+                commentLoopCount = 0;
             }
             catch (HttpRequestException ex)
             {
