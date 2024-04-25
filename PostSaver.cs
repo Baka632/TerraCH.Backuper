@@ -192,7 +192,7 @@ internal static class PostSaver
                 StringContent postContent = new($"post_id={postId}&page={commentPage}");
                 postContent.Headers.ContentType = postMimeType;
 
-                HttpResponseMessage result = await RequestClient.PostAsync(TerraCHPostCommentUrl, postContent);
+                HttpResponseMessage result = await RequestClient.PostAsync(TerraCHDynamicCommentUrl, postContent);
                 content = await result.Content.ReadAsStringAsync();
                 SaveCommentCore(content, commentPage, postDir);
                 commentPage++;

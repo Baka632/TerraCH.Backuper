@@ -78,6 +78,7 @@ savePostsCommand.SetHandler(async (postPath, maxPost, configPath) =>
 saveSinglePostCommand.SetHandler(async (savePath, targetPost) =>
 {
     Console.WriteLine("备份操作已开始......");
+    Console.WriteLine($"目标帖子: {targetPost}");
     await PostSaver.BackupTarget(targetPost, savePath);
 }, pathOption, targetPostOption);
 
