@@ -14,7 +14,8 @@ public static class CommonValues
     public const string TerraCHAuthorBase = "https://terrach.net/author/";
     public const int WaitTimeMilliseconds = 2000;
 
-    public static readonly Uri TerraCHBase = new("https://terrach.net/");
+    public static readonly Uri TerraCHBaseUri = new("https://terrach.net/");
+    public static readonly Uri TerraCHAuthorBaseUri = new("https://terrach.net/author/");
     public static readonly HttpClient RequestClient = new();
     public static readonly CancellationTokenSource CancelToken = new();
 }

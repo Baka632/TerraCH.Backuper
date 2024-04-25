@@ -7,10 +7,13 @@ Console.CancelKeyPress += OnConsoleCancelKeyPress;
 RootCommand rootCommand = new("Terra Communication Hub Backuper");
 Command saveSinglePostCommand = new("single-post", "备份单个帖子/动态/文章");
 Command savePostsCommand = new("posts", "备份帖子（包含动态与文章）");
+Command saveSingleAuthorCommand = new("single-author", "备份单个用户页面。");
 Command saveAuthorsCommand = new("authors", "备份用户页面。");
+Command saveAuthorCardsCommand = new("author-cards", "备份用户卡片。");
+Command saveSingleAuthorCardCommand = new("single-author-card", "备份单个用户卡片。");
 
-Option<int?> maxPostOption = new("--max-post", "指示在到达哪个帖子后就停止备份。");
-Option<int> targetPostOption = new("--target-post", "指示备份哪个帖子。")
+Option<int?> maxIdOption = new("--max-id", "指示在到达哪个 ID 后就停止备份。");
+Option<int> targetIdOption = new("--target-id", "指示备份哪个 ID 所代表的内容。")
 {
     IsRequired = true,
 };
@@ -43,20 +46,30 @@ pathOption.AddValidator(result =>
     }
 });
 
-savePostsCommand.AddOption(maxPostOption);
+savePostsCommand.AddOption(maxIdOption);
 savePostsCommand.AddOption(configPathOption);
-
-saveSinglePostCommand.AddOption(targetPostOption);
-
+saveAuthorsCommand.AddOption(maxIdOption);
 saveAuthorsCommand.AddOption(configPathOption);
+saveAuthorCardsCommand.AddOption(maxIdOption);
+saveAuthorCardsCommand.AddOption(configPathOption);
+
+saveSinglePostCommand.AddOption(targetIdOption);
+saveSingleAuthorCommand.AddOption(targetIdOption);
+saveSingleAuthorCardCommand.AddOption(targetIdOption);
 
 savePostsCommand.AddOption(pathOption);
 saveSinglePostCommand.AddOption(pathOption);
 saveAuthorsCommand.AddOption(pathOption);
+saveSingleAuthorCommand.AddOption(pathOption);
+saveAuthorCardsCommand.AddOption(pathOption);
+saveSingleAuthorCardCommand.AddOption(pathOption);
 
 rootCommand.AddCommand(savePostsCommand);
 rootCommand.AddCommand(saveAuthorsCommand);
 rootCommand.AddCommand(saveSinglePostCommand);
+rootCommand.AddCommand(saveSingleAuthorCommand);
+rootCommand.AddCommand(saveAuthorCardsCommand);
+rootCommand.AddCommand(saveSingleAuthorCardCommand);
 
 savePostsCommand.SetHandler(async (postPath, maxPost, configPath) =>
 {
@@ -67,30 +80,70 @@ savePostsCommand.SetHandler(async (postPath, maxPost, configPath) =>
     Console.WriteLine("==========");
     if (maxPost.HasValue)
     {
-        await PostSaver.StartBackup(config, postPath, maxPost.Value);
+        await PostSaver.SavePosts(config, postPath, maxPost.Value);
     }
     else
     {
-        await PostSaver.StartBackup(config, postPath);
+        await PostSaver.SavePosts(config, postPath);
     }
-}, pathOption, maxPostOption, configPathOption);
+}, pathOption, maxIdOption, configPathOption);
 
 saveSinglePostCommand.SetHandler(async (savePath, targetPost) =>
 {
     Console.WriteLine("备份操作已开始......");
     Console.WriteLine($"目标帖子: {targetPost}");
-    await PostSaver.BackupTarget(targetPost, savePath);
-}, pathOption, targetPostOption);
+    await PostSaver.SaveSinglePost(targetPost, savePath);
+}, pathOption, targetIdOption);
 
-saveAuthorsCommand.SetHandler((authorsPath, configPath) =>
+saveAuthorsCommand.SetHandler(async (authorsPath, configPath, maxId) =>
 {
     Config config = new(configPath);
     Console.WriteLine("备份操作已开始......");
     Console.WriteLine("当前进度");
     Console.WriteLine($"用户: {config.AuthorPosition}");
     Console.WriteLine("==========");
-    //TODO:
-}, pathOption, configPathOption);
+
+    if (maxId.HasValue)
+    {
+        await AuthorSaver.SaveAuthors(config, authorsPath, maxId.Value);
+    }
+    else
+    {
+        await AuthorSaver.SaveAuthors(config, authorsPath);
+    }
+}, pathOption, configPathOption, maxIdOption);
+
+saveSingleAuthorCommand.SetHandler(async (authorsPath, targetId) =>
+{
+    Console.WriteLine("备份操作已开始......");
+    Console.WriteLine($"目标用户: {targetId}");
+    await AuthorSaver.SaveSingleAuthor(targetId, authorsPath);
+}, pathOption, targetIdOption);
+
+saveAuthorCardsCommand.SetHandler(async (authorsPath, configPath, maxId) =>
+{
+    Config config = new(configPath);
+    Console.WriteLine("保存卡片操作已开始......");
+    Console.WriteLine("当前进度");
+    Console.WriteLine($"用户: {config.AuthorCardsPosition}");
+    Console.WriteLine("==========");
+
+    if (maxId.HasValue)
+    {
+        await AuthorSaver.SaveAuthorCards(config, authorsPath, maxId.Value);
+    }
+    else
+    {
+        await AuthorSaver.SaveAuthorCards(config, authorsPath);
+    }
+}, pathOption, configPathOption, maxIdOption);
+
+saveSingleAuthorCardCommand.SetHandler(async (authorsPath, targetId) =>
+{
+    Console.WriteLine("保存卡片操作已开始......");
+    Console.WriteLine($"目标用户: {targetId}");
+    await AuthorSaver.SaveSingleAuthorCard(targetId, authorsPath);
+}, pathOption, targetIdOption);
 
 await rootCommand.InvokeAsync(args);
 

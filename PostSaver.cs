@@ -11,7 +11,7 @@ internal static class PostSaver
 {
     private static readonly HtmlParser parser = new();
 
-    public static async Task StartBackup(Config config, string postPath, int maxPost = 29725)
+    public static async Task SavePosts(Config config, string postPath, int maxPost = 29725)
     {
         int loopCount = 0;
 
@@ -24,7 +24,7 @@ internal static class PostSaver
 
             try
             {
-                await BackupTarget(config.PostPosition, postPath);
+                await SaveSinglePost(config.PostPosition, postPath);
                 config.PostPosition++;
                 loopCount = 0;
             }
@@ -43,7 +43,7 @@ internal static class PostSaver
         }
     }
 
-    public static async Task BackupTarget(int postId, string postPath)
+    public static async Task SaveSinglePost(int postId, string postPath)
     {
         int page = 1;
         string targetUrl = Path.Combine(TerraCHPageBase, $"{postId}.html");
@@ -55,7 +55,7 @@ internal static class PostSaver
             string html = await message.Content.ReadAsStringAsync();
 
             string folderName = message.RequestMessage?.RequestUri is not null ?
-                TerraCHBase.MakeRelativeUri(message.RequestMessage.RequestUri).ToString() :
+                TerraCHBaseUri.MakeRelativeUri(message.RequestMessage.RequestUri).ToString() :
                 postId.ToString();
 
             string postDir = Path.Combine(postPath, folderName);
@@ -131,10 +131,10 @@ internal static class PostSaver
         else if (message.StatusCode == HttpStatusCode.NotFound)
         {
             string folderName = message.RequestMessage?.RequestUri is not null ?
-                TerraCHBase.MakeRelativeUri(message.RequestMessage.RequestUri).ToString() :
+                TerraCHBaseUri.MakeRelativeUri(message.RequestMessage.RequestUri).ToString() :
                 postId.ToString();
 
-            string postDir = Path.Combine(postPath, $"{folderName}[404]");
+            string postDir = Path.Combine(postPath, $"[404]{folderName}");
             if (Directory.Exists(postDir) != true)
             {
                 Directory.CreateDirectory(postDir);

@@ -4,8 +4,10 @@ public class Config
 {
     private readonly string postPath;
     private readonly string authorPath;
+    private readonly string authorCardsPath;
     private int postPosition = 1;
     private int authorPosition = 1;
+    private int authorCardsPosition = 1;
 
     public int PostPosition
     {
@@ -26,6 +28,18 @@ public class Config
             File.WriteAllText(authorPath, authorPosition.ToString());
         }
     }
+    
+    public int AuthorCardsPosition
+    {
+        get => authorCardsPosition;
+        set
+        {
+            authorCardsPosition = value;
+            File.WriteAllText(authorCardsPath, authorCardsPosition.ToString());
+        }
+    }
+
+
     public Config(string configFolderPath)
     {
         if (Directory.Exists(configFolderPath))
@@ -56,6 +70,20 @@ public class Config
                 {
                     string refStr = File.ReadAllText(authorPath);
                     authorPosition = int.Parse(refStr);
+                }
+            }
+            
+            {
+                authorCardsPath = Path.Combine(configFolderPath, "author_cards.txt");
+                if (Path.Exists(authorCardsPath) != true)
+                {
+                    using FileStream stream = File.Create(authorCardsPath);
+                    stream.Write("1"u8);
+                }
+                else
+                {
+                    string refStr = File.ReadAllText(authorCardsPath);
+                    authorCardsPosition = int.Parse(refStr);
                 }
             }
         }
