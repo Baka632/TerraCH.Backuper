@@ -1,246 +1,99 @@
-﻿using System.Net;
-using System.Net.Http.Headers;
-using AngleSharp.Dom;
-using AngleSharp.Html.Dom;
-using AngleSharp.Html.Parser;
-using TerraCH.Backuper;
+﻿using TerraCH.Backuper;
+using System.CommandLine;
 using static TerraCH.Backuper.CommonValues;
 
 Console.CancelKeyPress += OnConsoleCancelKeyPress;
 
-Console.WriteLine("备份操作已开始......");
-Config config = new(@"E:\Backups[Local Computer]\TerraCH Backup\Config");
-string postPath = @"E:\Backups[Local Computer]\TerraCH Backup\Posts";
-string authorsPath = @"E:\Backups[Local Computer]\TerraCH Backup\Authors";
+RootCommand rootCommand = new("Terra Communication Hub Backuper");
+Command saveSinglePostCommand = new("single-post", "备份单个帖子/动态/文章");
+Command savePostsCommand = new("posts", "备份帖子（包含动态与文章）");
+Command saveAuthorsCommand = new("authors", "备份用户页面。");
 
-Console.WriteLine("当前进度");
-Console.WriteLine($"Post: {config.PostPosition}");
-Console.WriteLine($"Author: {config.AuthorPosition}");
-Console.WriteLine("==========");
-
-int loopCount = 0;
-HtmlParser parser = new();
-while (config.PostPosition < 29800)
+Option<int?> maxPostOption = new("--max-post", "指示在到达哪个帖子后就停止备份。");
+Option<int> targetPostOption = new("--target-post", "指示备份哪个帖子。")
 {
-    if (CancelToken.IsCancellationRequested)
+    IsRequired = true,
+};
+
+Option<string> configPathOption = new("--config-path", "配置文件文件夹。")
+{
+    IsRequired = true,
+};
+configPathOption.AddValidator(result =>
+{
+    string? path = result.Tokens[0].Value;
+
+    if (Directory.Exists(path) != true)
     {
-        Console.WriteLine("再见。");
-        break;
+        result.ErrorMessage = "目标文件夹不存在。";
     }
+});
 
-    string targetUrl = Path.Combine(TerraCHPageBase, $"{config.PostPosition}.html");
-    MediaTypeHeaderValue postMimeType = new("application/x-www-form-urlencoded", "UTF-8");
+Option<string> pathOption = new("--path", "保存目标使用的文件夹的路径。")
+{
+    IsRequired = true,
+};
+pathOption.AddValidator(result =>
+{
+    string? path = result.Tokens[0].Value;
 
-    try
+    if (Directory.Exists(path) != true)
     {
-        int page = 1;
-        using HttpResponseMessage message = await RequestClient.GetAsync(targetUrl);
-
-        if (message.IsSuccessStatusCode)
-        {
-            string html = await message.Content.ReadAsStringAsync();
-
-            string folderName = message.RequestMessage?.RequestUri is not null ?
-                TerraCHBase.MakeRelativeUri(message.RequestMessage.RequestUri).ToString() :
-                config.PostPosition.ToString();
-
-            string postDir = Path.Combine(postPath, folderName);
-            if (Directory.Exists(postDir) != true)
-            {
-                Directory.CreateDirectory(postDir);
-            }
-
-            string targetPath = Path.Combine(postDir, $"{page}.html");
-            File.WriteAllText(targetPath, html);
-            Console.WriteLine($"已保存：{targetPath} | 状态码：{message.StatusCode}");
-
-            using IHtmlDocument document = parser.ParseDocument(html);
-
-            if (document.GetElementsByClassName("follow-see").Length != 0)
-            {
-                Console.Beep();
-                Console.WriteLine("\t此页面存在需关注才能查看的内容。");
-            }
-            
-            if (document.GetElementsByClassName("comment-see").Length != 0)
-            {
-                Console.Beep();
-                Console.WriteLine("\t此页面存在需回复才能查看的内容。");
-            }
-
-            if (document.GetElementsByClassName("jinsom-tips").Length != 0)
-            {
-                Console.Beep();
-                Console.WriteLine($"\t此页面存在登陆/购买才能查看的内容。");
-            }
-
-            if (document.GetElementsByClassName("jinsom-posts-list").Length != 0)
-            {
-                // 动态/文章
-
-                if (document.GetElementsByClassName(" jinsom-post-comment-more").Length != 0)
-                {
-                    // 有下一页
-                    int commentPage = 2;
-                    int commentLoopCount = 0;
-
-                    string content = string.Empty;
-                    do
-                    {
-                        try
-                        {
-                            StringContent postContent = new($"post_id={config.PostPosition}&page={commentPage}");
-                            postContent.Headers.ContentType = postMimeType;
-                            HttpResponseMessage result = await RequestClient.PostAsync(TerraCHDynamicCommentUrl, postContent);
-                            content = await result.Content.ReadAsStringAsync();
-                            if (content != "0" && string.IsNullOrWhiteSpace(content) != true)
-                            {
-                                using IHtmlDocument commentDoc = parser.ParseDocument(content);
-                                if (commentDoc.GetElementsByClassName("follow-see").Length != 0)
-                                {
-                                    Console.Beep();
-                                    Console.WriteLine($"\t第 {commentPage} 页存在需关注才能查看的内容。");
-                                }
-
-                                if (commentDoc.GetElementsByClassName("comment-see").Length != 0)
-                                {
-                                    Console.Beep();
-                                    Console.WriteLine($"\t第 {commentPage} 页存在需回复才能查看的内容。");
-                                }
-                                
-                                if (commentDoc.GetElementsByClassName("jinsom-tips").Length != 0)
-                                {
-                                    Console.Beep();
-                                    Console.WriteLine($"\t\t第 {commentPage} 页存在登陆/购买才能查看的内容。");
-                                }
-
-                                string commentTargetPath = Path.Combine(postDir, $"{commentPage}.html");
-                                File.WriteAllText(commentTargetPath, content);
-                                Console.WriteLine($"\t已下载此页的评论（第 {commentPage} 页）");
-                                commentPage++;
-                            }
-                        }
-                        catch (HttpRequestException)
-                        {
-                            Console.WriteLine($"\t下载此页评论失败，正在重试.....（{loopCount} of 5）");
-                            commentLoopCount++;
-
-                            if (commentLoopCount > 5)
-                            {
-                                Console.WriteLine($"\t下载此页评论失败，正在跳转到下一个帖子.....");
-                                break;
-                            }
-                        }
-
-                        //Thread.Sleep(WaitTimeMilliseconds);
-                    } while (content != "0" && string.IsNullOrWhiteSpace(content) != true);
-                }
-                // 没下一页直接走
-            }
-            else
-            {
-                // 帖子
-
-                if (document.GetElementsByClassName("jinsom-bbs-comment-list-page").Length != 0)
-                {
-                    // 有下一页
-                    IElement bbs_header = document.GetElementsByClassName("jinsom-bbs-single-header").First();
-                    string? bbs_id = bbs_header.GetAttribute("data");
-                    int commentPage = 2;
-                    int commentLoopCount = 0;
-
-                    string content = string.Empty;
-                    do
-                    {
-                        try
-                        {
-                            StringContent postContent = new($"page={commentPage}&post_id={config.PostPosition}&number=10&bbs_id={bbs_id}");
-                            postContent.Headers.ContentType = postMimeType;
-                            HttpResponseMessage result = await RequestClient.PostAsync(TerraCHPostCommentUrl, postContent);
-                            content = await result.Content.ReadAsStringAsync();
-                            if (content != "0" && string.IsNullOrWhiteSpace(content) != true)
-                            {
-                                using IHtmlDocument commentDoc = parser.ParseDocument(content);
-                                if (commentDoc.GetElementsByClassName("follow-see").Length != 0)
-                                {
-                                    Console.Beep();
-                                    Console.WriteLine($"\t\t第 {commentPage} 页存在需关注才能查看的内容。");
-                                }
-
-                                if (commentDoc.GetElementsByClassName("comment-see").Length != 0)
-                                {
-                                    Console.Beep();
-                                    Console.WriteLine($"\t\t第 {commentPage} 页存在需回复才能查看的内容。");
-                                }
-
-                                if (commentDoc.GetElementsByClassName("jinsom-tips").Length != 0)
-                                {
-                                    Console.Beep();
-                                    Console.WriteLine($"\t\t第 {commentPage} 页存在登陆/购买才能查看的内容。");
-                                }
-
-                                string commentTargetPath = Path.Combine(postDir, $"{commentPage}.html");
-                                File.WriteAllText(commentTargetPath, content);
-                                Console.WriteLine($"\t已下载此页的评论（第 {commentPage} 页）");
-                                commentPage++;
-                            }
-                        }
-                        catch (HttpRequestException)
-                        {
-                            Console.WriteLine($"\t下载此页评论失败，正在重试.....（{loopCount} of 5）");
-                            commentLoopCount++;
-
-                            if (commentLoopCount > 5)
-                            {
-                                Console.WriteLine($"\t下载此页评论失败，正在跳转到下一个帖子.....");
-                                break;
-                            }
-                        }
-
-                        //Thread.Sleep(WaitTimeMilliseconds);
-                    } while (content != "0" && string.IsNullOrWhiteSpace(content) != true);
-                }
-                // 同样，没下一页直接走
-            }
-
-            config.PostPosition++;
-        }
-        else if (message.StatusCode == HttpStatusCode.NotFound)
-        {
-            string folderName = message.RequestMessage?.RequestUri is not null ?
-                TerraCHBase.MakeRelativeUri(message.RequestMessage.RequestUri).ToString() :
-                config.PostPosition.ToString();
-
-            string postDir = Path.Combine(postPath, $"[404]{folderName}");
-            if (Directory.Exists(postDir) != true)
-            {
-                Directory.CreateDirectory(postDir);
-            }
-
-            Console.WriteLine($"此页未找到：{targetUrl} | 状态码：{message.StatusCode}");
-            config.PostPosition++;
-        }
-        else
-        {
-            Console.WriteLine($"HTTP 错误：{message.StatusCode}");
-            config.PostPosition++;
-        }
+        result.ErrorMessage = "目标文件夹不存在。";
     }
-    catch (HttpRequestException ex)
+});
+
+savePostsCommand.AddOption(maxPostOption);
+savePostsCommand.AddOption(configPathOption);
+
+saveSinglePostCommand.AddOption(targetPostOption);
+
+saveAuthorsCommand.AddOption(configPathOption);
+
+savePostsCommand.AddOption(pathOption);
+saveSinglePostCommand.AddOption(pathOption);
+saveAuthorsCommand.AddOption(pathOption);
+
+rootCommand.AddCommand(savePostsCommand);
+rootCommand.AddCommand(saveAuthorsCommand);
+rootCommand.AddCommand(saveSinglePostCommand);
+
+savePostsCommand.SetHandler(async (postPath, maxPost, configPath) =>
+{
+    Config config = new(configPath);
+    Console.WriteLine("备份操作已开始......");
+    Console.WriteLine("当前进度");
+    Console.WriteLine($"帖子: {config.PostPosition}");
+    Console.WriteLine("==========");
+    if (maxPost.HasValue)
     {
-        Console.Beep();
-        Console.WriteLine($"\t下载此页面失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
-        loopCount++;
-
-        if (loopCount > 5)
-        {
-            Console.WriteLine("下载此页面失败。");
-            break;
-        }
+        await PostSaver.StartBackup(config, postPath, maxPost.Value);
     }
+    else
+    {
+        await PostSaver.StartBackup(config, postPath);
+    }
+}, pathOption, maxPostOption, configPathOption);
 
-    //Thread.Sleep(WaitTimeMilliseconds);
-}
+saveSinglePostCommand.SetHandler(async (savePath, targetPost) =>
+{
+    Console.WriteLine("备份操作已开始......");
+    await PostSaver.BackupTarget(targetPost, savePath);
+}, pathOption, targetPostOption);
+
+saveAuthorsCommand.SetHandler((authorsPath, configPath) =>
+{
+    Config config = new(configPath);
+    Console.WriteLine("备份操作已开始......");
+    Console.WriteLine("当前进度");
+    Console.WriteLine($"用户: {config.AuthorPosition}");
+    Console.WriteLine("==========");
+    //TODO:
+}, pathOption, configPathOption);
+
+await rootCommand.InvokeAsync(args);
+
+Console.WriteLine("再见。");
 
 static void OnConsoleCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
 {
