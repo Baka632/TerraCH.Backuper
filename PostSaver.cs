@@ -28,7 +28,7 @@ internal static class PostSaver
                 config.PostPosition++;
                 loopCount = 0;
             }
-            catch (HttpRequestException ex)
+           catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
                 Console.Beep();
                 Console.WriteLine($"\t下载此页面失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
@@ -178,7 +178,7 @@ internal static class PostSaver
                 commentPage++;
                 commentLoopCount = 0;
             }
-            catch (HttpRequestException ex)
+           catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
                 if (HandleCommentSaveProcessError(ref commentLoopCount, ex))
                 {
@@ -212,7 +212,7 @@ internal static class PostSaver
                 commentPage++;
                 commentLoopCount = 0;
             }
-            catch (HttpRequestException ex)
+           catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
                 if (HandleCommentSaveProcessError(ref commentLoopCount, ex))
                 {
@@ -268,7 +268,7 @@ internal static class PostSaver
         }
     }
 
-    private static bool HandleCommentSaveProcessError(ref int commentLoopCount, HttpRequestException ex)
+    private static bool HandleCommentSaveProcessError(ref int commentLoopCount, Exception ex)
     {
         Console.WriteLine($"\t下载此页评论失败，正在重试.....（{commentLoopCount + 1} of 5）\n\t异常：{ex.Message}");
         commentLoopCount++;

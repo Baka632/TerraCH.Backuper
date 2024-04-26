@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using AngleSharp.Html.Dom;
 using AngleSharp.Html.Parser;
 using static TerraCH.Backuper.CommonValues;
@@ -27,7 +28,7 @@ internal static class AuthorSaver
                 config.AuthorPosition++;
                 loopCount = 0;
             }
-            catch (HttpRequestException ex)
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
                 Console.Beep();
                 Console.WriteLine($"\t下载此页面失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
@@ -130,7 +131,7 @@ internal static class AuthorSaver
                 config.AuthorCardsPosition++;
                 loopCount = 0;
             }
-            catch (HttpRequestException ex)
+           catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
                 Console.Beep();
                 Console.WriteLine($"\t下载此用户的卡片失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
@@ -208,7 +209,7 @@ internal static class AuthorSaver
                 page++;
                 loopCount = 0;
             }
-            catch (HttpRequestException ex)
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
                 Console.WriteLine($"\t下载此用户动态失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
                 loopCount++;
@@ -225,7 +226,7 @@ internal static class AuthorSaver
 
     private static async Task SaveFollowing(int authorId, string authorDir, string? cookie)
     {
-        string contentFolder = Path.Combine(authorDir, "following");
+        string contentFolder = Path.Combine(authorDir, "follow");
         MediaTypeHeaderValue postMimeType = new("application/x-www-form-urlencoded", "UTF-8");
         StringContent mainPostContent = new($"author_id={authorId}");
         mainPostContent.Headers.ContentType = postMimeType;
@@ -246,11 +247,9 @@ internal static class AuthorSaver
             string mainContentPath = Path.Combine(contentFolder, "main.html");
             string mainContent = await mainContentMessage.Content.ReadAsStringAsync();
             File.WriteAllText(mainContentPath, mainContent);
-            Console.WriteLine($"\t已保存：{mainContentPath} | 状态码：{mainContentMessage.StatusCode}");
+            Console.WriteLine($"\t已保存此用户的主关注页");
 
             string followingFolder = Path.Combine(contentFolder, "following");
-            string fansFolder = Path.Combine(contentFolder, "fans");
-
             {
                 int followingPage = 1;
                 int followingLoopCount = 0;
@@ -258,17 +257,44 @@ internal static class AuthorSaver
                 {
                     StringContent followingContent = new($"page={followingPage}&user_id={authorId}&type=following&number=30");
                     followingContent.Headers.ContentType = postMimeType;
+                    if (string.IsNullOrWhiteSpace(cookie) != true)
+                    {
+                        followingContent.Headers.Add("Cookie", cookie);
+                    }
 
                     try
                     {
-                        HttpResponseMessage message = await RequestClient.PostAsync("https://terrach.net/wp-content/themes/LightSNS/mobile/module/user/follower.php", mainPostContent);
+                        HttpResponseMessage message = await RequestClient.PostAsync("https://terrach.net/wp-content/themes/LightSNS/mobile/module/user/follower.php", followingContent);
 
                         if (message.IsSuccessStatusCode)
                         {
+                            string json = await message.Content.ReadAsStringAsync();
 
+                            using JsonDocument document = JsonDocument.Parse(json);
+                            int code = document.RootElement.GetProperty("code"u8).GetInt32();
+
+                            if (code == 0)
+                            {
+                                break;
+                            }
+
+                            if (Directory.Exists(followingFolder) != true)
+                            {
+                                Directory.CreateDirectory(followingFolder);
+                            }
+
+                            string filePath = Path.Combine(followingFolder, $"{followingPage}.json");
+                            File.WriteAllText(filePath, json);
+                            Console.WriteLine($"\t\t已下载此用户的用户关注列表（第 {followingPage} 页）");
+                            followingPage++;
+                            followingLoopCount = 0;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"\t\t下载此用户关注项失败，HTTP 错误：{message.StatusCode}");
                         }
                     }
-                    catch (HttpRequestException ex)
+                    catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
                     {
                         Console.WriteLine($"\t\t下载此用户关注项失败，正在重试.....（{followingLoopCount + 1} of 5）\n\t\t异常：{ex.Message}");
                         followingLoopCount++;
@@ -283,7 +309,66 @@ internal static class AuthorSaver
                 }
             }
 
-            //TODO:
+            string fansFolder = Path.Combine(contentFolder, "fans");
+            {
+                int fansPage = 1;
+                int fansLoopCount = 0;
+
+                while (true)
+                {
+                    StringContent fansContent = new($"page={fansPage}&user_id={authorId}&type=follower&number=30");
+                    fansContent.Headers.ContentType = postMimeType;
+                    if (string.IsNullOrWhiteSpace(cookie) != true)
+                    {
+                        fansContent.Headers.Add("Cookie", cookie);
+                    }
+
+                    try
+                    {
+                        HttpResponseMessage message = await RequestClient.PostAsync("https://terrach.net/wp-content/themes/LightSNS/mobile/module/user/follower.php", fansContent);
+
+                        if (message.IsSuccessStatusCode)
+                        {
+                            string json = await message.Content.ReadAsStringAsync();
+
+                            using JsonDocument document = JsonDocument.Parse(json);
+                            int code = document.RootElement.GetProperty("code"u8).GetInt32();
+
+                            if (code == 0)
+                            {
+                                break;
+                            }
+
+                            if (Directory.Exists(fansFolder) != true)
+                            {
+                                Directory.CreateDirectory(fansFolder);
+                            }
+
+                            string filePath = Path.Combine(fansFolder, $"{fansPage}.json");
+                            File.WriteAllText(filePath, json);
+                            Console.WriteLine($"\t\t已下载此用户的粉丝列表（第 {fansPage} 页）");
+                            fansPage++;
+                            fansLoopCount = 0;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"\t\t下载此用户粉丝项失败，HTTP 错误：{message.StatusCode}");
+                        }
+                    }
+                    catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+                    {
+                        Console.WriteLine($"\t\t下载此用户粉丝项失败，正在重试.....（{fansLoopCount + 1} of 5）\n\t\t异常：{ex.Message}");
+                        fansLoopCount++;
+
+                        if (fansLoopCount >= 5)
+                        {
+                            Console.Beep();
+                            Console.WriteLine($"\t\t下载此用户粉丝项失败，正在跳转到下一个项目.....\n\t\t异常：{ex.Message}");
+                            break;
+                        }
+                    }
+                }
+            }
         }
         else
         {
@@ -346,7 +431,7 @@ internal static class AuthorSaver
                 page++;
                 loopCount = 0;
             }
-            catch (HttpRequestException ex)
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
                 Console.WriteLine($"\t下载此用户转发项失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
                 loopCount++;
@@ -418,7 +503,7 @@ internal static class AuthorSaver
                 page++;
                 loopCount = 0;
             }
-            catch (HttpRequestException ex)
+           catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
                 Console.WriteLine($"\t下载此用户喜欢项失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
                 loopCount++;
