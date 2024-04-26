@@ -12,6 +12,7 @@ Command saveAuthorsCommand = new("authors", "备份用户页面。");
 Command saveAuthorCardsCommand = new("author-cards", "备份用户卡片。");
 Command saveSingleAuthorCardCommand = new("single-author-card", "备份单个用户卡片。");
 
+Option<string> cookieOption = new("--cookie", "配置请求时所使用的 Cookie。");
 Option<int?> maxIdOption = new("--max-id", "指示在到达哪个 ID 后就停止备份。");
 Option<int> targetIdOption = new("--target-id", "指示备份哪个 ID 所代表的内容。")
 {

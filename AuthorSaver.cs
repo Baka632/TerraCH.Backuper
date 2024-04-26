@@ -73,6 +73,7 @@ internal static class AuthorSaver
                 await SaveDynamic(authorId, authorDir);
             }
 
+            await SaveFollowing(authorId, authorDir);
             await SaveForward(authorId, authorDir);
 
             bool isLikesPrivate = !document.All.Any(element =>
@@ -99,7 +100,7 @@ internal static class AuthorSaver
                 Directory.CreateDirectory(postDir);
             }
 
-            Console.WriteLine($"此页未找到：{targetUrl} | 状态码：{message.StatusCode}");
+            Console.WriteLine($"此用户未找到：{targetUrl} | 状态码：{message.StatusCode}");
         }
         else
         {
@@ -210,6 +211,70 @@ internal static class AuthorSaver
                     break;
                 }
             }
+        }
+    }
+
+    private static async Task SaveFollowing(int authorId, string authorDir)
+    {
+        string contentFolder = Path.Combine(authorDir, "following");
+        MediaTypeHeaderValue postMimeType = new("application/x-www-form-urlencoded", "UTF-8");
+        StringContent mainPostContent = new($"author_id={authorId}");
+        mainPostContent.Headers.ContentType = postMimeType;
+
+        HttpResponseMessage mainContentMessage = await RequestClient.PostAsync("https://terrach.net/wp-content/themes/LightSNS/module/stencil/member-follow.php", mainPostContent);
+
+        if (mainContentMessage.IsSuccessStatusCode)
+        {
+            if (Directory.Exists(contentFolder) != true)
+            {
+                Directory.CreateDirectory(contentFolder);
+            }
+
+            string mainContentPath = Path.Combine(contentFolder, "main.html");
+            string mainContent = await mainContentMessage.Content.ReadAsStringAsync();
+            File.WriteAllText(mainContentPath, mainContent);
+            Console.WriteLine($"\t已保存：{mainContentPath} | 状态码：{mainContentMessage.StatusCode}");
+
+            string followingFolder = Path.Combine(contentFolder, "following");
+            string fansFolder = Path.Combine(contentFolder, "fans");
+
+            {
+                int followingPage = 1;
+                int followingLoopCount = 0;
+                while (true)
+                {
+                    StringContent followingContent = new($"page={followingPage}&user_id={authorId}&type=following&number=30");
+                    followingContent.Headers.ContentType = postMimeType;
+
+                    try
+                    {
+                        HttpResponseMessage message = await RequestClient.PostAsync("https://terrach.net/wp-content/themes/LightSNS/mobile/module/user/follower.php", mainPostContent);
+
+                        if (message.IsSuccessStatusCode)
+                        {
+
+                        }
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        Console.WriteLine($"\t\t下载此用户关注项失败，正在重试.....（{followingLoopCount + 1} of 5）\n\t\t异常：{ex.Message}");
+                        followingLoopCount++;
+
+                        if (followingLoopCount >= 5)
+                        {
+                            Console.Beep();
+                            Console.WriteLine($"\t\t下载此用户关注项失败，正在跳转到下一个项目.....\n\t\t异常：{ex.Message}");
+                            break;
+                        }
+                    }
+                }
+            }
+
+            //TODO:
+        }
+        else
+        {
+            Console.WriteLine($"\t下载此用户关注项失败 | 状态码：{mainContentMessage.StatusCode}");
         }
     }
 
