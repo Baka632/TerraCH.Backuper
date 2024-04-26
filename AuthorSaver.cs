@@ -11,9 +11,10 @@ internal static class AuthorSaver
 {
     private static readonly HtmlParser parser = new();
 
-    public static async Task SaveAuthors(Config config, string authorPath, int maxAuthor = 21500, string? cookie = null)
+    public static void SaveAuthors(Config config, string authorPath, int maxAuthor = 21500, string? cookie = null)
     {
         int loopCount = 0;
+        bool shouldBreak = false;
 
         while (config.AuthorPosition < maxAuthor)
         {
@@ -22,24 +23,40 @@ internal static class AuthorSaver
                 break;
             }
 
-            try
+            int position = config.AuthorPosition;
+            List<Task> tasks = new(10);
+            for (int i = 0; i < 10; i++)
             {
-                await SaveSingleAuthor(config.AuthorPosition, authorPath, cookie);
-                config.AuthorPosition++;
-                loopCount = 0;
-            }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
-            {
-                Console.Beep();
-                Console.WriteLine($"\t下载此页面失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
-                loopCount++;
+                int taskPosition = position + i;
 
-                if (loopCount > 5)
+                tasks.Add(Task.Run(async () =>
                 {
-                    Console.WriteLine("\t下载此页面失败。");
-                    break;
-                }
+                    try
+                    {
+                        await SaveSingleAuthor(taskPosition, authorPath, cookie);
+                        loopCount = 0;
+                    }
+                    catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+                    {
+                        Console.Beep();
+                        Console.WriteLine($"\t下载页面 {taskPosition} 失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
+                        loopCount++;
+
+                        if (loopCount > 5)
+                        {
+                            Console.WriteLine($"\t下载页面 {taskPosition} 失败。");
+                            shouldBreak = true;
+                        }
+                    }
+                }));
             }
+
+            Task.WaitAll([.. tasks]);
+            if (shouldBreak)
+            {
+                break;
+            }
+            config.AuthorPosition += 10;
         }
     }
 
@@ -69,7 +86,7 @@ internal static class AuthorSaver
 
             string targetPath = Path.Combine(authorDir, "main.html");
             File.WriteAllText(targetPath, html);
-            Console.WriteLine($"已保存：{targetPath} | 状态码：{message.StatusCode}");
+            Console.WriteLine($"已保存 {authorId} 的用户页 | 状态码：{message.StatusCode}");
 
             using IHtmlDocument document = parser.ParseDocument(html);
 
@@ -106,7 +123,7 @@ internal static class AuthorSaver
                 Directory.CreateDirectory(postDir);
             }
 
-            Console.WriteLine($"此用户未找到：{targetUrl} | 状态码：{message.StatusCode}");
+            Console.WriteLine($"用户 {authorId} 未找到：{targetUrl} | 状态码：{message.StatusCode}");
         }
         else
         {
@@ -199,7 +216,7 @@ internal static class AuthorSaver
 
                     string filePath = Path.Combine(contentFolder, $"{page - 1}.html");
                     File.WriteAllText(filePath, content);
-                    Console.WriteLine($"\t已下载此用户的动态（第 {page} 页）");
+                    Console.WriteLine($"\t已下载用户 {authorId} 的动态（第 {page} 页）");
                 }
                 else
                 {
@@ -211,13 +228,13 @@ internal static class AuthorSaver
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
-                Console.WriteLine($"\t下载此用户动态失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
+                Console.WriteLine($"\t下载用户 {authorId} 动态失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
                 loopCount++;
 
                 if (loopCount >= 5)
                 {
                     Console.Beep();
-                    Console.WriteLine($"\t下载此用户动态失败，正在跳转到下一个项目.....\n\t异常：{ex.Message}");
+                    Console.WriteLine($"\t下载用户 {authorId} 动态失败，正在跳转到下一个项目.....\n\t异常：{ex.Message}");
                     break;
                 }
             }
@@ -247,7 +264,7 @@ internal static class AuthorSaver
             string mainContentPath = Path.Combine(contentFolder, "main.html");
             string mainContent = await mainContentMessage.Content.ReadAsStringAsync();
             File.WriteAllText(mainContentPath, mainContent);
-            Console.WriteLine($"\t已保存此用户的主关注页");
+            Console.WriteLine($"\t已保存用户 {authorId} 的主关注页");
 
             string followingFolder = Path.Combine(contentFolder, "following");
             {
@@ -285,24 +302,24 @@ internal static class AuthorSaver
 
                             string filePath = Path.Combine(followingFolder, $"{followingPage}.json");
                             File.WriteAllText(filePath, json);
-                            Console.WriteLine($"\t\t已下载此用户的用户关注列表（第 {followingPage} 页）");
+                            Console.WriteLine($"\t\t已下载用户 {authorId} 的用户关注列表（第 {followingPage} 页）");
                             followingPage++;
                             followingLoopCount = 0;
                         }
                         else
                         {
-                            Console.WriteLine($"\t\t下载此用户关注项失败，HTTP 错误：{message.StatusCode}");
+                            Console.WriteLine($"\t\t下载用户 {authorId} 的关注项失败，HTTP 错误：{message.StatusCode}");
                         }
                     }
                     catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
                     {
-                        Console.WriteLine($"\t\t下载此用户关注项失败，正在重试.....（{followingLoopCount + 1} of 5）\n\t\t异常：{ex.Message}");
+                        Console.WriteLine($"\t\t下载用户 {authorId} 的关注项失败，正在重试.....（{followingLoopCount + 1} of 5）\n\t\t异常：{ex.Message}");
                         followingLoopCount++;
 
                         if (followingLoopCount >= 5)
                         {
                             Console.Beep();
-                            Console.WriteLine($"\t\t下载此用户关注项失败，正在跳转到下一个项目.....\n\t\t异常：{ex.Message}");
+                            Console.WriteLine($"\t\t下载用户 {authorId} 的关注项失败，正在跳转到下一个项目.....\n\t\t异常：{ex.Message}");
                             break;
                         }
                     }
@@ -346,24 +363,24 @@ internal static class AuthorSaver
 
                             string filePath = Path.Combine(fansFolder, $"{fansPage}.json");
                             File.WriteAllText(filePath, json);
-                            Console.WriteLine($"\t\t已下载此用户的粉丝列表（第 {fansPage} 页）");
+                            Console.WriteLine($"\t\t已下载用户 {authorId} 的粉丝列表（第 {fansPage} 页）");
                             fansPage++;
                             fansLoopCount = 0;
                         }
                         else
                         {
-                            Console.WriteLine($"\t\t下载此用户粉丝项失败，HTTP 错误：{message.StatusCode}");
+                            Console.WriteLine($"\t\t下载用户 {authorId} 的粉丝项失败，HTTP 错误：{message.StatusCode}");
                         }
                     }
                     catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
                     {
-                        Console.WriteLine($"\t\t下载此用户粉丝项失败，正在重试.....（{fansLoopCount + 1} of 5）\n\t\t异常：{ex.Message}");
+                        Console.WriteLine($"\t\t下载用户 {authorId} 的粉丝项失败，正在重试.....（{fansLoopCount + 1} of 5）\n\t\t异常：{ex.Message}");
                         fansLoopCount++;
 
                         if (fansLoopCount >= 5)
                         {
                             Console.Beep();
-                            Console.WriteLine($"\t\t下载此用户粉丝项失败，正在跳转到下一个项目.....\n\t\t异常：{ex.Message}");
+                            Console.WriteLine($"\t\t下载用户 {authorId} 的粉丝项失败，正在跳转到下一个项目.....\n\t\t异常：{ex.Message}");
                             break;
                         }
                     }
@@ -372,7 +389,7 @@ internal static class AuthorSaver
         }
         else
         {
-            Console.WriteLine($"\t下载此用户关注项失败 | 状态码：{mainContentMessage.StatusCode}");
+            Console.WriteLine($"\t下载用户 {authorId} 的关注项失败 | 状态码：{mainContentMessage.StatusCode}");
         }
     }
 
@@ -413,14 +430,14 @@ internal static class AuthorSaver
                         // 空的
                         string filePath = Path.Combine(contentFolder, "empty.html");
                         File.WriteAllText(filePath, content);
-                        Console.WriteLine($"\t已下载此用户的转发项（内容为空）");
+                        Console.WriteLine($"\t已下载用户 {authorId} 的转发项（内容为空）");
                         break;
                     }
                     else
                     {
                         string filePath = Path.Combine(contentFolder, $"{page}.html");
                         File.WriteAllText(filePath, content);
-                        Console.WriteLine($"\t已下载此用户的转发项（第 {page} 页）");
+                        Console.WriteLine($"\t已下载用户 {authorId} 的转发项（第 {page} 页）");
                     }
                 }
                 else
@@ -433,13 +450,13 @@ internal static class AuthorSaver
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
-                Console.WriteLine($"\t下载此用户转发项失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
+                Console.WriteLine($"\t下载用户 {authorId} 的转发项失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
                 loopCount++;
 
                 if (loopCount >= 5)
                 {
                     Console.Beep();
-                    Console.WriteLine($"\t下载此用户转发项失败，正在跳转到下一个项目.....\n\t异常：{ex.Message}");
+                    Console.WriteLine($"\t下载用户 {authorId} 的转发项失败，正在跳转到下一个项目.....\n\t异常：{ex.Message}");
                     break;
                 }
             }
@@ -485,14 +502,14 @@ internal static class AuthorSaver
                         // 空的
                         string filePath = Path.Combine(contentFolder, "empty.html");
                         File.WriteAllText(filePath, content);
-                        Console.WriteLine($"\t已下载此用户的喜欢项（内容为空）");
+                        Console.WriteLine($"\t已下载用户 {authorId} 的喜欢项（内容为空）");
                         break;
                     }
                     else
                     {
                         string filePath = Path.Combine(contentFolder, $"{page}.html");
                         File.WriteAllText(filePath, content);
-                        Console.WriteLine($"\t已下载此用户的喜欢项（第 {page} 页）");
+                        Console.WriteLine($"\t已下载用户 {authorId} 的喜欢项（第 {page} 页）");
                     }
                 }
                 else
@@ -505,13 +522,13 @@ internal static class AuthorSaver
             }
            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
             {
-                Console.WriteLine($"\t下载此用户喜欢项失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
+                Console.WriteLine($"\t下载用户 {authorId} 的喜欢项失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
                 loopCount++;
 
                 if (loopCount >= 5)
                 {
                     Console.Beep();
-                    Console.WriteLine($"\t下载此用户喜欢项失败，正在跳转到下一个项目.....\n\t异常：{ex.Message}");
+                    Console.WriteLine($"\t下载用户 {authorId} 的喜欢项失败，正在跳转到下一个项目.....\n\t异常：{ex.Message}");
                     break;
                 }
             }

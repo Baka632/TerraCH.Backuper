@@ -63,11 +63,22 @@ public static class StaticFileDownloader
             try
             {
                 using HttpResponseMessage result = await RequestClient.GetAsync(targetDir);
+
+                if (result.IsSuccessStatusCode)
+                {
+                    byte[] content = await result.Content.ReadAsByteArrayAsync();
+
+                    string filePath = Path.Join(targetDir, uri.Segments[^1]);
+                    File.WriteAllBytes(filePath, content);
+                }
+                else
+                {
+
+                }
             }
             catch (Exception)
             {
 
-                throw;
             }
         }
     }

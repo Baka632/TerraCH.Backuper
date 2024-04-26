@@ -100,7 +100,7 @@ saveSinglePostCommand.SetHandler(async (savePath, targetPost, cookie) =>
     await PostSaver.SaveSinglePost(targetPost, savePath, cookie);
 }, pathOption, targetIdOption, cookieOption);
 
-saveAuthorsCommand.SetHandler(async (authorsPath, configPath, maxId, cookie) =>
+saveAuthorsCommand.SetHandler((authorsPath, configPath, maxId, cookie) =>
 {
     Config config = new(configPath);
     Console.WriteLine("备份操作已开始......");
@@ -110,11 +110,11 @@ saveAuthorsCommand.SetHandler(async (authorsPath, configPath, maxId, cookie) =>
 
     if (maxId.HasValue)
     {
-        await AuthorSaver.SaveAuthors(config, authorsPath, maxId.Value, cookie);
+        AuthorSaver.SaveAuthors(config, authorsPath, maxId.Value, cookie);
     }
     else
     {
-        await AuthorSaver.SaveAuthors(config, authorsPath, cookie: cookie);
+        AuthorSaver.SaveAuthors(config, authorsPath, cookie: cookie);
     }
 }, pathOption, configPathOption, maxIdOption, cookieOption);
 
