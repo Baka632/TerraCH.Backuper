@@ -12,7 +12,7 @@ Command saveAuthorsCommand = new("authors", "备份用户页面。");
 Command saveAuthorCardsCommand = new("author-cards", "备份用户卡片。");
 Command saveSingleAuthorCardCommand = new("single-author-card", "备份单个用户卡片。");
 
-Option<string> cookieOption = new("--cookie", "配置请求时所使用的 Cookie。");
+Option<string?> cookieOption = new("--cookie", "配置请求时所使用的 Cookie。");
 Option<int?> maxIdOption = new("--max-id", "指示在到达哪个 ID 后就停止备份。");
 Option<int> targetIdOption = new("--target-id", "指示备份哪个 ID 所代表的内容。")
 {
@@ -64,6 +64,10 @@ saveAuthorsCommand.AddOption(pathOption);
 saveSingleAuthorCommand.AddOption(pathOption);
 saveAuthorCardsCommand.AddOption(pathOption);
 saveSingleAuthorCardCommand.AddOption(pathOption);
+savePostsCommand.AddOption(cookieOption);
+saveSinglePostCommand.AddOption(cookieOption);
+saveAuthorsCommand.AddOption(cookieOption);
+saveSingleAuthorCommand.AddOption(cookieOption);
 
 rootCommand.AddCommand(savePostsCommand);
 rootCommand.AddCommand(saveAuthorsCommand);
@@ -72,7 +76,7 @@ rootCommand.AddCommand(saveSingleAuthorCommand);
 rootCommand.AddCommand(saveAuthorCardsCommand);
 rootCommand.AddCommand(saveSingleAuthorCardCommand);
 
-savePostsCommand.SetHandler(async (postPath, maxPost, configPath) =>
+savePostsCommand.SetHandler(async (postPath, maxPost, configPath, cookie) =>
 {
     Config config = new(configPath);
     Console.WriteLine("备份操作已开始......");
@@ -81,22 +85,22 @@ savePostsCommand.SetHandler(async (postPath, maxPost, configPath) =>
     Console.WriteLine("==========");
     if (maxPost.HasValue)
     {
-        await PostSaver.SavePosts(config, postPath, maxPost.Value);
+        await PostSaver.SavePosts(config, postPath, maxPost.Value, cookie);
     }
     else
     {
-        await PostSaver.SavePosts(config, postPath);
+        await PostSaver.SavePosts(config, postPath, cookie: cookie);
     }
-}, pathOption, maxIdOption, configPathOption);
+}, pathOption, maxIdOption, configPathOption, cookieOption);
 
-saveSinglePostCommand.SetHandler(async (savePath, targetPost) =>
+saveSinglePostCommand.SetHandler(async (savePath, targetPost, cookie) =>
 {
     Console.WriteLine("备份操作已开始......");
     Console.WriteLine($"目标帖子: {targetPost}");
-    await PostSaver.SaveSinglePost(targetPost, savePath);
-}, pathOption, targetIdOption);
+    await PostSaver.SaveSinglePost(targetPost, savePath, cookie);
+}, pathOption, targetIdOption, cookieOption);
 
-saveAuthorsCommand.SetHandler(async (authorsPath, configPath, maxId) =>
+saveAuthorsCommand.SetHandler(async (authorsPath, configPath, maxId, cookie) =>
 {
     Config config = new(configPath);
     Console.WriteLine("备份操作已开始......");
@@ -106,20 +110,20 @@ saveAuthorsCommand.SetHandler(async (authorsPath, configPath, maxId) =>
 
     if (maxId.HasValue)
     {
-        await AuthorSaver.SaveAuthors(config, authorsPath, maxId.Value);
+        await AuthorSaver.SaveAuthors(config, authorsPath, maxId.Value, cookie);
     }
     else
     {
-        await AuthorSaver.SaveAuthors(config, authorsPath);
+        await AuthorSaver.SaveAuthors(config, authorsPath, cookie: cookie);
     }
-}, pathOption, configPathOption, maxIdOption);
+}, pathOption, configPathOption, maxIdOption, cookieOption);
 
-saveSingleAuthorCommand.SetHandler(async (authorsPath, targetId) =>
+saveSingleAuthorCommand.SetHandler(async (authorsPath, targetId, cookie) =>
 {
     Console.WriteLine("备份操作已开始......");
     Console.WriteLine($"目标用户: {targetId}");
-    await AuthorSaver.SaveSingleAuthor(targetId, authorsPath);
-}, pathOption, targetIdOption);
+    await AuthorSaver.SaveSingleAuthor(targetId, authorsPath, cookie);
+}, pathOption, targetIdOption, cookieOption);
 
 saveAuthorCardsCommand.SetHandler(async (authorsPath, configPath, maxId) =>
 {

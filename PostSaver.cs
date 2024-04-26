@@ -11,7 +11,7 @@ internal static class PostSaver
 {
     private static readonly HtmlParser parser = new();
 
-    public static async Task SavePosts(Config config, string postPath, int maxPost = 29725)
+    public static async Task SavePosts(Config config, string postPath, int maxPost = 29725, string? cookie = null)
     {
         int loopCount = 0;
 
@@ -24,7 +24,7 @@ internal static class PostSaver
 
             try
             {
-                await SaveSinglePost(config.PostPosition, postPath);
+                await SaveSinglePost(config.PostPosition, postPath, cookie);
                 config.PostPosition++;
                 loopCount = 0;
             }
@@ -43,12 +43,18 @@ internal static class PostSaver
         }
     }
 
-    public static async Task SaveSinglePost(int postId, string postPath)
+    public static async Task SaveSinglePost(int postId, string postPath, string? cookie = null)
     {
         int page = 1;
         string targetUrl = Path.Combine(TerraCHPageBase, $"{postId}.html");
 
-        using HttpResponseMessage message = await RequestClient.GetAsync(targetUrl);
+        HttpRequestMessage requestMessage = new(HttpMethod.Get, targetUrl);
+        if (string.IsNullOrWhiteSpace(cookie) != true)
+        {
+            requestMessage.Headers.Add("Cookie", cookie);
+        }
+
+        using HttpResponseMessage message = await RequestClient.SendAsync(requestMessage);
 
         if (message.IsSuccessStatusCode)
         {
@@ -110,7 +116,7 @@ internal static class PostSaver
                 if (document.GetElementsByClassName(" jinsom-post-comment-more").Length != 0)
                 {
                     // 有下一页
-                    await SaveDynamicComment(postId, postDir);
+                    await SaveDynamicComment(postId, postDir, cookie);
                 }
                 // 没下一页直接走
             }
@@ -123,7 +129,7 @@ internal static class PostSaver
                     IElement bbs_header = document.GetElementsByClassName("jinsom-bbs-single-header").First();
                     string? bbs_id = bbs_header.GetAttribute("data");
 
-                    await SavePostComment(postId, bbs_id, postDir);
+                    await SavePostComment(postId, bbs_id, postDir, cookie);
                 }
                 // 同样，没下一页直接走
             }
@@ -148,7 +154,7 @@ internal static class PostSaver
         }
     }
 
-    private static async Task SavePostComment(int postId, string? bbs_id, string postDir)
+    private static async Task SavePostComment(int postId, string? bbs_id, string postDir, string? cookie = null)
     {
         MediaTypeHeaderValue postMimeType = new("application/x-www-form-urlencoded", "UTF-8");
 
@@ -161,6 +167,10 @@ internal static class PostSaver
             {
                 StringContent postContent = new($"page={commentPage}&post_id={postId}&number=10&bbs_id={bbs_id}");
                 postContent.Headers.ContentType = postMimeType;
+                if (string.IsNullOrWhiteSpace(cookie) != true)
+                {
+                    postContent.Headers.Add("cookie", cookie);
+                }
 
                 HttpResponseMessage result = await RequestClient.PostAsync(TerraCHPostCommentUrl, postContent);
                 content = await result.Content.ReadAsStringAsync();
@@ -178,7 +188,7 @@ internal static class PostSaver
         } while (content != "0" && string.IsNullOrWhiteSpace(content) != true);
     }
     
-    private static async Task SaveDynamicComment(int postId, string postDir)
+    private static async Task SaveDynamicComment(int postId, string postDir, string? cookie = null)
     {
         MediaTypeHeaderValue postMimeType = new("application/x-www-form-urlencoded", "UTF-8");
 
@@ -191,6 +201,10 @@ internal static class PostSaver
             {
                 StringContent postContent = new($"post_id={postId}&page={commentPage}");
                 postContent.Headers.ContentType = postMimeType;
+                if (string.IsNullOrWhiteSpace(cookie) != true)
+                {
+                    postContent.Headers.Add("cookie", cookie);
+                }
 
                 HttpResponseMessage result = await RequestClient.PostAsync(TerraCHDynamicCommentUrl, postContent);
                 content = await result.Content.ReadAsStringAsync();

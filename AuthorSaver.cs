@@ -10,7 +10,7 @@ internal static class AuthorSaver
 {
     private static readonly HtmlParser parser = new();
 
-    public static async Task SaveAuthors(Config config, string authorPath, int maxAuthor = 21500)
+    public static async Task SaveAuthors(Config config, string authorPath, int maxAuthor = 21500, string? cookie = null)
     {
         int loopCount = 0;
 
@@ -23,7 +23,7 @@ internal static class AuthorSaver
 
             try
             {
-                await SaveSingleAuthor(config.AuthorPosition, authorPath);
+                await SaveSingleAuthor(config.AuthorPosition, authorPath, cookie);
                 config.AuthorPosition++;
                 loopCount = 0;
             }
@@ -42,10 +42,15 @@ internal static class AuthorSaver
         }
     }
 
-    public static async Task SaveSingleAuthor(int authorId, string authorPath)
+    public static async Task SaveSingleAuthor(int authorId, string authorPath, string? cookie = null)
     {
         string targetUrl = Path.Combine(TerraCHAuthorBase, authorId.ToString());
-        using HttpResponseMessage message = await RequestClient.GetAsync(targetUrl);
+        HttpRequestMessage requestMessage = new(HttpMethod.Get, targetUrl);
+        if (string.IsNullOrWhiteSpace(cookie) != true)
+        {
+            requestMessage.Headers.Add("Cookie", cookie);
+        }
+        using HttpResponseMessage message = await RequestClient.SendAsync(requestMessage);
 
         string folderName = message.RequestMessage?.RequestUri is not null ?
                 TerraCHAuthorBaseUri.MakeRelativeUri(message.RequestMessage.RequestUri).ToString() :
@@ -70,11 +75,11 @@ internal static class AuthorSaver
             if (document.GetElementsByClassName("jinsom-more-posts").Length != 0)
             {
                 // 有下一页动态
-                await SaveDynamic(authorId, authorDir);
+                await SaveDynamic(authorId, authorDir, cookie);
             }
 
-            await SaveFollowing(authorId, authorDir);
-            await SaveForward(authorId, authorDir);
+            await SaveFollowing(authorId, authorDir, cookie);
+            await SaveForward(authorId, authorDir, cookie);
 
             bool isLikesPrivate = !document.All.Any(element =>
             {
@@ -90,7 +95,7 @@ internal static class AuthorSaver
                 return false;
             });
 
-            await SaveLikes(authorId, authorDir, isLikesPrivate);
+            await SaveLikes(authorId, authorDir, isLikesPrivate, cookie);
         }
         else if (message.StatusCode == HttpStatusCode.NotFound)
         {
@@ -162,7 +167,7 @@ internal static class AuthorSaver
         }
     }
 
-    private static async Task SaveDynamic(int authorId, string authorDir)
+    private static async Task SaveDynamic(int authorId, string authorDir, string? cookie)
     {
         string contentFolder = Path.Combine(authorDir, "dynamics");
         int page = 2;
@@ -176,6 +181,10 @@ internal static class AuthorSaver
             {
                 StringContent postContent = new($"type=all&page={page}&load_type=more&index=0&author_id={authorId}");
                 postContent.Headers.ContentType = postMimeType;
+                if (string.IsNullOrWhiteSpace(cookie) != true)
+                {
+                    postContent.Headers.Add("Cookie", cookie);
+                }
 
                 HttpResponseMessage result = await RequestClient.PostAsync("https://terrach.net/wp-content/themes/LightSNS/module/data/post.php", postContent);
                 string content = await result.Content.ReadAsStringAsync();
@@ -214,12 +223,16 @@ internal static class AuthorSaver
         }
     }
 
-    private static async Task SaveFollowing(int authorId, string authorDir)
+    private static async Task SaveFollowing(int authorId, string authorDir, string? cookie)
     {
         string contentFolder = Path.Combine(authorDir, "following");
         MediaTypeHeaderValue postMimeType = new("application/x-www-form-urlencoded", "UTF-8");
         StringContent mainPostContent = new($"author_id={authorId}");
         mainPostContent.Headers.ContentType = postMimeType;
+        if (string.IsNullOrWhiteSpace(cookie) != true)
+        {
+            mainPostContent.Headers.Add("Cookie", cookie);
+        }
 
         HttpResponseMessage mainContentMessage = await RequestClient.PostAsync("https://terrach.net/wp-content/themes/LightSNS/module/stencil/member-follow.php", mainPostContent);
 
@@ -278,7 +291,7 @@ internal static class AuthorSaver
         }
     }
 
-    private static async Task SaveForward(int authorId, string authorDir)
+    private static async Task SaveForward(int authorId, string authorDir, string? cookie)
     {
         string contentFolder = Path.Combine(authorDir, "forwards");
 
@@ -293,6 +306,10 @@ internal static class AuthorSaver
             {
                 StringContent postContent = new($"type=reprint&page={page}&load_type={(page == 1 ? "ajax" : "more")}&index=2&author_id={authorId}");
                 postContent.Headers.ContentType = postMimeType;
+                if (string.IsNullOrWhiteSpace(cookie) != true)
+                {
+                    postContent.Headers.Add("Cookie", cookie);
+                }
 
                 HttpResponseMessage result = await RequestClient.PostAsync("https://terrach.net/wp-content/themes/LightSNS/module/data/post.php", postContent);
                 string content = await result.Content.ReadAsStringAsync();
@@ -344,7 +361,7 @@ internal static class AuthorSaver
         }
     }
 
-    private static async Task SaveLikes(int authorId, string authorDir, bool isPrivate)
+    private static async Task SaveLikes(int authorId, string authorDir, bool isPrivate, string? cookie)
     {
         string contentFolder = isPrivate
             ? Path.Combine(authorDir, "[private]likes")
@@ -361,6 +378,10 @@ internal static class AuthorSaver
             {
                 StringContent postContent = new($"type=like&page={page}&load_type={(page == 1 ? "ajax" : "more")}&index=3&author_id={authorId}");
                 postContent.Headers.ContentType = postMimeType;
+                if (string.IsNullOrWhiteSpace(cookie) != true)
+                {
+                    postContent.Headers.Add("Cookie", cookie);
+                }
 
                 HttpResponseMessage result = await RequestClient.PostAsync("https://terrach.net/wp-content/themes/LightSNS/module/data/post.php", postContent);
                 string content = await result.Content.ReadAsStringAsync();
