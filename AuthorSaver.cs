@@ -13,7 +13,6 @@ internal static class AuthorSaver
 
     public static void SaveAuthors(Config config, string authorPath, int maxAuthor = 21500, string? cookie = null)
     {
-        int loopCount = 0;
         bool shouldBreak = false;
 
         while (config.AuthorPosition < maxAuthor)
@@ -34,19 +33,12 @@ internal static class AuthorSaver
                     try
                     {
                         await SaveSingleAuthor(taskPosition, authorPath, cookie);
-                        loopCount = 0;
                     }
                     catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
                     {
                         Console.Beep();
-                        Console.WriteLine($"\t下载页面 {taskPosition} 失败，正在重试.....（{loopCount + 1} of 5）\n\t异常：{ex.Message}");
-                        loopCount++;
-
-                        if (loopCount > 5)
-                        {
-                            Console.WriteLine($"\t下载页面 {taskPosition} 失败。");
-                            shouldBreak = true;
-                        }
+                        Console.WriteLine($"\t下载页面 {taskPosition} 失败。\n\t异常：{ex.Message}");
+                        shouldBreak = true;
                     }
                 }));
             }
