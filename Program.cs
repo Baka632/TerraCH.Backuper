@@ -11,6 +11,7 @@ Command saveSingleAuthorCommand = new("single-author", "备份单个用户页面
 Command saveAuthorsCommand = new("authors", "备份用户页面。");
 Command saveAuthorCardsCommand = new("author-cards", "备份用户卡片。");
 Command saveSingleAuthorCardCommand = new("single-author-card", "备份单个用户卡片。");
+Command saveStaticContentCommand = new("static-file", "备份静态文件。");
 
 Option<string?> cookieOption = new("--cookie", "配置请求时所使用的 Cookie。");
 Option<int?> maxIdOption = new("--max-id", "指示在到达哪个 ID 后就停止备份。");
@@ -47,6 +48,20 @@ pathOption.AddValidator(result =>
     }
 });
 
+Option<string> targetPathOption = new("--target-path", "存有 HTML 文件的文件夹。")
+{
+    IsRequired = true,
+};
+targetPathOption.AddValidator(result =>
+{
+    string? path = result.Tokens[0].Value;
+
+    if (Directory.Exists(path) != true)
+    {
+        result.ErrorMessage = "目标文件夹不存在。";
+    }
+});
+
 savePostsCommand.AddOption(maxIdOption);
 savePostsCommand.AddOption(configPathOption);
 saveAuthorsCommand.AddOption(maxIdOption);
@@ -64,10 +79,13 @@ saveAuthorsCommand.AddOption(pathOption);
 saveSingleAuthorCommand.AddOption(pathOption);
 saveAuthorCardsCommand.AddOption(pathOption);
 saveSingleAuthorCardCommand.AddOption(pathOption);
+saveStaticContentCommand.AddOption(pathOption);
 savePostsCommand.AddOption(cookieOption);
 saveSinglePostCommand.AddOption(cookieOption);
 saveAuthorsCommand.AddOption(cookieOption);
 saveSingleAuthorCommand.AddOption(cookieOption);
+
+saveStaticContentCommand.AddOption(targetPathOption);
 
 rootCommand.AddCommand(savePostsCommand);
 rootCommand.AddCommand(saveAuthorsCommand);
@@ -75,6 +93,7 @@ rootCommand.AddCommand(saveSinglePostCommand);
 rootCommand.AddCommand(saveSingleAuthorCommand);
 rootCommand.AddCommand(saveAuthorCardsCommand);
 rootCommand.AddCommand(saveSingleAuthorCardCommand);
+rootCommand.AddCommand(saveStaticContentCommand);
 
 savePostsCommand.SetHandler(async (postPath, maxPost, configPath, cookie) =>
 {
@@ -149,6 +168,12 @@ saveSingleAuthorCardCommand.SetHandler(async (authorsPath, targetId) =>
     Console.WriteLine($"目标用户: {targetId}");
     await AuthorSaver.SaveSingleAuthorCard(targetId, authorsPath);
 }, pathOption, targetIdOption);
+
+saveStaticContentCommand.SetHandler(async (targetPath, savePath) =>
+{
+    Console.WriteLine("保存静态文件操作已开始......");
+    await StaticFileSaver.SaveFiles(targetPath, savePath);
+}, targetPathOption, pathOption);
 
 await rootCommand.InvokeAsync(args);
 

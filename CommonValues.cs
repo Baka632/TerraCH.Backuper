@@ -18,4 +18,10 @@ public static class CommonValues
     public static readonly Uri TerraCHAuthorBaseUri = new("https://terrach.net/author/");
     public static readonly HttpClient RequestClient = new();
     public static readonly CancellationTokenSource CancelToken = new();
+    public static readonly string[] ExcludeHosts =
+    [
+        "beian.miit.gov.cn", "www.reddit.com", "twitter.com", "www.youtube.com", "img.ams1.imgbed.xyz",
+        "p1.pximg.pixivel.moe", "s.pc.qq.com", "www.pixiv.net", "xxsy.vip", "mobile.twitter.com", "www.twitter.com",
+
+    ];
 }
