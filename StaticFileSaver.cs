@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 using AngleSharp.Dom;
 using AngleSharp.Html.Dom;
@@ -11,6 +12,7 @@ public static partial class StaticFileSaver
 {
     private static readonly HtmlParser Parser = new();
     private static readonly string[] OutReferenceAttributes = ["href", "src", "link"];
+    private static readonly Uri WaterAreaCategoryUri = new("https://terrach.net/category/水区");
 
     public static async Task SaveFiles(string targetFolderPath, string saveFolderPath)
     {
@@ -56,7 +58,7 @@ public static partial class StaticFileSaver
             {
                 foreach (string attr in OutReferenceAttributes)
                 {
-                    if (element.HasAttribute(attr))
+                    if (element.HasAttribute(attr) && element.TagName != "IFRAME")
                     {
                         return true;
                     }
@@ -64,6 +66,8 @@ public static partial class StaticFileSaver
 
                 return false;
             });
+
+        bool shouldDelay = false;
 
         foreach (IElement item in elements)
         {
@@ -75,19 +79,31 @@ public static partial class StaticFileSaver
             string? href = item.GetAttribute("href");
             string? src = item.GetAttribute("src");
             string? link = item.GetAttribute("link");
-            Uri uri;
+            Uri? uri;
 
             if (href != null)
             {
-                uri = new(href, UriKind.RelativeOrAbsolute);
+                if (Uri.TryCreate(href, UriKind.RelativeOrAbsolute, out uri) != true)
+                {
+                    Console.WriteLine($"\t链接格式错误：{uri}");
+                    continue;
+                }
             }
             else if (src != null)
             {
-                uri = new(src, UriKind.RelativeOrAbsolute);
+                if (Uri.TryCreate(src, UriKind.RelativeOrAbsolute, out uri) != true)
+                {
+                    Console.WriteLine($"\t链接格式错误：{uri}");
+                    continue;
+                }
             }
             else if (link != null)
             {
-                uri = new(link, UriKind.RelativeOrAbsolute);
+                if (Uri.TryCreate(link, UriKind.RelativeOrAbsolute, out uri) != true)
+                {
+                    Console.WriteLine($"\t链接格式错误：{uri}");
+                    continue;
+                }
             }
             else
             {
@@ -132,7 +148,10 @@ public static partial class StaticFileSaver
             Regex matchAuthor = GetMatchAuthorPageRegex();
             string uriString = uri.ToString();
 
-            if (matchAuthor.IsMatch(uriString) || uriString == "https://terrach.net/contents.css" || uriString == "https://terrach.net/tableselection.css")
+            if (matchAuthor.IsMatch(uriString)
+                || uriString == "https://terrach.net/contents.css"
+                || uriString == "https://terrach.net/tableselection.css"
+                || uriString.Contains("泰拉通讯枢纽_files"))
             {
                 continue;
             }
@@ -149,7 +168,7 @@ public static partial class StaticFileSaver
                 uriPart = string.Join(string.Empty, uri.Segments[..^1]);
             }
 
-            string targetDir = Path.Join(outputFolderPath, uri.Host, uriPart);
+            string targetDir = WebUtility.UrlDecode(Path.Join(outputFolderPath, uri.Host, uriPart));
             string filePath;
             if (isDir)
             {
@@ -160,7 +179,11 @@ public static partial class StaticFileSaver
                 filePath = Path.Join(targetDir, WebUtility.UrlDecode(uri.Segments[^1]));
                 if (Path.GetFileName(filePath) == string.Empty)
                 {
-                    filePath = Path.Join(filePath, "index");
+                    filePath = Path.Join(filePath, "index.html");
+                }
+                else if (Path.GetExtension(filePath) == string.Empty)
+                {
+                    filePath += ".html";
                 }
             }
 
@@ -171,7 +194,34 @@ public static partial class StaticFileSaver
 
             try
             {
-                using HttpResponseMessage result = await RequestClient.GetAsync(uri);
+                HttpRequestMessage requestMessage;
+
+                if (uri.Host == "ark-dev-1256540909.file.myqcloud.com")
+                {
+                    if (shouldDelay)
+                    {
+                        await Task.Delay(1500);
+                        shouldDelay = false;
+                    }
+                    else
+                    {
+                        shouldDelay = true;
+                    }
+
+                    uri = new Uri(TerraCHCdnBaseUri, uri.ToString()[TerraCHImageUriBase.Length..]);
+                    requestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+
+                    requestMessage.Headers.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0");
+                    requestMessage.Headers.Referrer = TerraCHBaseUri;
+                    requestMessage.Headers.Accept.ParseAdd("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
+                    shouldDelay = true;
+                }
+                else
+                {
+                    requestMessage = new HttpRequestMessage(HttpMethod.Get, uri);
+                }
+
+                using HttpResponseMessage result = await RequestClient.SendAsync(requestMessage);
 
                 if (result.IsSuccessStatusCode)
                 {
@@ -196,7 +246,7 @@ public static partial class StaticFileSaver
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"\t未能下载 {uri}，因为出现异常：{ex.Message}");
+                    Console.WriteLine($"\t未能下载 {uri}，因为出现异常：{ex.Message}");
                 continue;
             }
         }
