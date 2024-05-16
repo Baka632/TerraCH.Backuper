@@ -187,7 +187,7 @@ public static partial class StaticFileSaver
                 }
             }
 
-            if (File.Exists(filePath) && File.ReadAllBytes(filePath).Length > 0)
+            if (File.Exists(filePath))
             {
                 continue;
             }
