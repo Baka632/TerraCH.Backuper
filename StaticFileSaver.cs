@@ -187,7 +187,7 @@ public static partial class StaticFileSaver
                 }
             }
 
-            if (File.Exists(filePath))
+            if (File.Exists(filePath) && File.ReadAllBytes(filePath).Length > 0)
             {
                 continue;
             }
@@ -246,7 +246,7 @@ public static partial class StaticFileSaver
             }
             catch (Exception ex)
             {
-                    Console.WriteLine($"\t未能下载 {uri}，因为出现异常：{ex.Message}");
+                Console.WriteLine($"\t未能下载 {uri}，因为出现异常：{ex.Message}");
                 continue;
             }
         }
