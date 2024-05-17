@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 using AngleSharp.Dom;
 using AngleSharp.Html.Dom;
@@ -12,7 +11,7 @@ public static partial class StaticFileSaver
 {
     private static readonly HtmlParser Parser = new();
     private static readonly string[] OutReferenceAttributes = ["href", "src", "link"];
-    private static readonly Uri WaterAreaCategoryUri = new("https://terrach.net/category/水区");
+    private static readonly DownloadFolderNameComparer downloadFolderNameComparer = new();
 
     public static async Task SaveFiles(string targetFolderPath, string saveFolderPath)
     {
@@ -33,7 +32,7 @@ public static partial class StaticFileSaver
                 await SaveSingleFileFromHtml(html, saveFolderPath);
             }
 
-            foreach (DirectoryInfo dir in directory.EnumerateDirectories())
+            foreach (DirectoryInfo dir in directory.EnumerateDirectories().OrderBy(info => info.Name, downloadFolderNameComparer))
             {
                 if (CancelToken.IsCancellationRequested)
                 {
@@ -254,4 +253,26 @@ public static partial class StaticFileSaver
 
     [GeneratedRegex(@"https://terrach\.net/author/(.*)")]
     private static partial Regex GetMatchAuthorPageRegex();
+
+    private class DownloadFolderNameComparer : IComparer<string>
+    {
+        public int Compare(string? x, string? y)
+        {
+            if (x is null || y is null)
+            {
+                return string.CompareOrdinal(x, y);
+            }
+
+            ReadOnlySpan<char> xSpan = x.AsSpan().TrimEnd(".html");
+            ReadOnlySpan<char> ySpan = y.AsSpan().TrimEnd(".html");
+            if (int.TryParse(xSpan, out int resultX) && int.TryParse(ySpan, out int resultY))
+            {
+                return resultX.CompareTo(resultY);
+            }
+            else
+            {
+                return string.CompareOrdinal(x, y);
+            }
+        }
+    }
 }
